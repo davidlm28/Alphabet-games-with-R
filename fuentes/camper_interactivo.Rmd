@@ -1,0 +1,155 @@
+---
+title: "CAMPER INTERACTIVO"
+subtitle: 'Grupo 4'
+author: 
+  - Ignacio García Luengo
+  - David Lázaro Martín
+  - Pablo Martín Escobar
+  - Xiya Sun 
+  - Yimin Zhou
+output:
+  pdf_document: default
+  html_document: default
+---
+## LECTURA DE DICCIONARIO
+Leemos el diccionario del archivo "dic_es.txt"
+```{r}
+con <- file(description = '../datos/dic_es.txt',
+            open = 'rt',
+            blocking = TRUE,
+            encoding = 'UTF-8')
+linesDic <- readLines(con)
+linesDic <- unique(linesDic)
+close(con)
+```
+
+## FUNCIONES QUE ESTABAN EN EL ARCHIVO camper.Rmd
+
+Función diccionario reducido
+```{r}
+dicRed<-function(v_dic,word){
+  param=nchar(word)
+  linesRed<-subset(v_dic,nchar(v_dic)==param)
+  return(linesRed)
+}
+```
+
+Función cambiar una letra
+```{r results='hide'}
+change_letter <- function(word, v_dic){
+  library(stringdist)
+  result <- subset(v_dic, 
+                       stringdist(v_dic, word, method = 'lv') == 1)  
+  return(result)
+}
+```
+
+Función permutaciones
+```{r}
+permutations <- function(word, v_dic){
+  cadena_word <- unlist(strsplit(word, split = ''))  
+  library(combinat)
+  lista_perm <- permn(cadena_word)
+  lista_perm_paste <- lapply(lista_perm, paste, collapse = '')  
+  vector_perm <- unlist(lista_perm_paste)
+
+  result <- subset(vector_perm, vector_perm%in%v_dic)  
+  return(result)
+}
+```
+
+Función cambio letra+permutaciones
+```{r}
+camper <- function(word, v_dic){
+  v_dicr<-dicRed(v_dic,word)
+  cambiar_letra <- change_letter(word, v_dicr)
+  permutaciones <- permutations(word, v_dicr)
+  result <- unique(c(cambiar_letra, permutaciones))
+  return(result)
+}
+```
+
+## FUNCIÓN: INTERACCIÓN CON EL USUARIO
+La función recibe como parámetro de entrada un diccionario y devuelve un vector con las palabras de la secuencia.
+Lo que hace la función es: el usuario introduce una palabra, el programa le devuelve otra (siguiendo las normas del juego) y así sucesivamente hasta que el programa o el usuario encuentre una palabra ganadora.
+
+```{r}
+camper_interactivo <- function(v_dic){
+  palabra <- readline('Introduzca la palabra inicial: ')
+  if (palabra%in%v_dic == FALSE){  # si la palabra introducida no es válida
+    cat('La palabra introducida no se encuentra en el diccionario, pruebe de nuevo.\n')
+    camper_interactivo(v_dic)
+  }
+  v_dic <- dicRed(unique(v_dic), palabra)  # reducimos el diccionario
+  v_dic <- setdiff(v_dic, palabra)
+  opciones <- camper(palabra, v_dic)
+  cadena <- c(palabra)
+  seguir <- TRUE  
+  while (seguir == TRUE || length(opciones) > 0){
+    # Turno de la máquina
+    # la máquina elige la palabra de las opciones que tiene menos longitud en su camper
+    min_pal <- length(opciones)
+    for (i in 1:length(opciones)){
+      # hacemos el camper de todas las opciones
+      if (length(camper(opciones[i],v_dic)) < min_pal){
+        min_pal <- i
+      }
+    }
+    palabra_ganadora <- opciones[min_pal]  
+    cat('Turno de la máquina\n')
+    cat(paste('Continúe la secuencia: ',palabra_ganadora,'\n'))
+    cadena <- c(cadena, palabra_ganadora)
+    v_dic <- setdiff(v_dic,palabra_ganadora)
+    # todas las palabras que el usuario puede introducir
+    opciones_usuario <- camper(palabra_ganadora,v_dic)  
+    # si no le quedan opciones al usuario: gana la máquina
+    if (length(opciones_usuario) == 0){
+      cat('¡Ha perdido!Otra vez será.\n')
+      break
+    }
+    
+    # Turno del usuario
+    cat('Su turno:')
+    palabra_usuario <- readline('Introduzca una palabra:  ')
+    # si la palabra introducida no sigue las normas del juego
+    while (palabra_usuario%in%opciones_usuario == FALSE){  
+      if (palabra_usuario%in%cadena){
+        cat('¡Error! La palabra dada ya se encuentra en la cadena. Intente de nuevo.\n')
+        cat(paste('Continúe la secuencia: ',palabra_ganadora,'\n'))
+        palabra_usuario <- readline('Introduzca una palabra: ')
+      }
+      else{
+        cat('La palabra introducida no se encuentra en 
+            el diccionario o ha realizado más de una cambio de letra 
+            o permutación simultáneamente, pruebe de nuevo.\n')
+        cat(paste('Continúe la secuencia: ',palabra_ganadora,'\n'))
+        palabra_usuario <- readline('Introduzca una palabra: ')
+      }
+    }
+    if ((stringdist(palabra_ganadora, palabra_usuario, method = 'lv') == 1)){
+      cat('¡Correcto! Ha realizado un cambio de letra válido.\n')
+    }
+    
+    else{cat('¡Correcto! Ha realizado una permutación válida.\n')}
+    # quitamos del diccionario la palabra introducida por el usuario
+    v_dic <- setdiff(v_dic,palabra_usuario)
+    
+    # añadimos la palabra del usuario a la cadena
+    cadena <- c(cadena, palabra_usuario)  
+    opciones <- camper(palabra_usuario,v_dic)
+    if (length(opciones) == 0){
+      cat('¡Ha ganado! Bien jugado.\n')
+      seguir <- FALSE
+    }
+    
+  }
+  return(cadena)
+  }
+```
+
+### Prueba de la función camper_interactivo
+```{r}
+prueba <- camper_interactivo(linesDic)
+prueba
+```
+

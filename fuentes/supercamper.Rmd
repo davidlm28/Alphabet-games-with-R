@@ -1,0 +1,211 @@
+---
+title: "SUPERCAMPER"
+subtitle: 'Grupo 4'
+author: 
+  - Ignacio García Luengo
+  - David Lázaro Martín
+  - Pablo Martín Escobar
+  - Xiya Sun 
+  - Yimin Zhou
+date: "09/01/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+# EL JUEGO DE CAMBIAR UNA LETRA O PERMUTAR
+## Lectura del diccionario
+```{r}
+con <- file(description = '../datos/dic_es.txt',
+            open = 'rt',
+            blocking = TRUE,
+            encoding = 'UTF-8')
+linesDic <- readLines(con)
+linesDic <- unique(linesDic)  # reducimos el diccionario por si hay palabras repetidas
+close(con)
+```
+
+## Función diccionario reducido
+```{r}
+dicRed<-function(v_dic,word){
+  param=nchar(word)
+  linesRed<-subset(v_dic,nchar(v_dic)==param)
+  return(linesRed)
+}
+```
+
+## Función cambiar una letra
+```{r}
+change_letter <- function(word, v_dic){
+  library(stringdist)
+  result <- subset(v_dic, stringdist(v_dic, word, method = 'lv') == 1)
+  return(result)
+}
+```
+
+## Función permutaciones
+```{r}
+permutations <- function(word, v_dic){
+  cadena_word <- unlist(strsplit(word, split = ''))  
+  library(combinat)
+  lista_perm <- permn(cadena_word)
+  lista_perm_paste <- lapply(lista_perm, paste, collapse = '')  
+  vector_perm <- unlist(lista_perm_paste)
+
+  result <- subset(vector_perm, vector_perm%in%v_dic)  
+  return(result)
+}
+```
+
+## Función cambio letra+permutaciones
+```{r}
+camper <- function(word, v_dic){
+  v_dicr<-dicRed(v_dic,word)
+  cambiar_letra <- change_letter(word, v_dicr)
+  permutaciones <- permutations(word, v_dicr)
+  result <- unique(c(cambiar_letra, permutaciones))
+  return(result)
+}
+```
+
+## Palabra al azar
+```{r}
+n_rand = sample(1:length(linesDic),1)
+palab_rand = linesDic[n_rand]
+```
+
+
+## Métodos para supercamper
+
+## Método 1:
+### Función auxiliar
+Devuelva la secuencia de palabras más larga a partir de la primera. El método a seguir es el siguiente: Calculamos el camper de la palabra inicial y vemos todas las que nos devuelve. Después, calculamos el camper de todas las posibles soluciones y escogemos la que sea más larga, es decir, la que vaya a tener más posibilidades en el siguiente paso.
+
+La función sec calcula las secuencias hasta las 1000 palabras, porque con 2000 va muy lento
+```{r}
+sec<-function(word,v_dic,secuencia){
+  v_dic=setdiff(v_dic,word)  # reducimos el diccionario quitando la palabra de entrada
+  res=camper(word,v_dic)  # palabras posibles haciendo cambio de letra o permutaciones
+  if (length(res)>0 & length(secuencia)<1000){
+    long=c()  # guardamos el número de posibilidades de cada palabra de res
+    for (i in 1:length(res)){
+      long=append(long,length(camper(res[i],v_dic)))
+    }
+    # de todas las palabras de res, 
+    # cogemos la que tiene mayor longitud de posibilidades
+    new_word=res[(which(long==max(long))[1])]  # Ponemos [1], 
+    #por si hay dos palabras de longitud máxima, así nos selecciona el primero
+    secuencia=append(secuencia,new_word)
+    sec(new_word,v_dic,secuencia)
+  }
+  else{
+    return(secuencia)}
+}
+```
+
+## Función supercamper
+Como hemos puesto length(secuencia)<1000 en la función sec, si la cadena máxima fuese de 2345, tendríamos que hacer un bucle para hallar las palabras que faltan.
+Por lo que esta función supercamper calcula la secuencia más larga de 1000 en 1000 utilizando la función sec si la secuencia superase las 1000 palabras.
+```{r}
+supercamper<-function(word,v_dic){
+  lines<-dicRed(v_dic,word)  # Reducimos el diccionario
+  secuencia=sec(word,lines,word)  # secuencia más 'larga' (máximo 1000 palabras)
+  len=length(secuencia)
+  result=secuencia
+  while (len%%1000==0){  #si la secuencia llega a mil palabras, vemos si la secuencia puede ser más larga
+    #hallo secuencia desde la última palabra
+    secuencia=sec(secuencia[1000],setdiff(lines,result),secuencia[1000])
+    len=length(secuencia)  #len de la siguiente secuencia
+    result=c(result,secuencia[2:len])  #secuencia[1] es result[length(result)],
+                                      #por lo que empezamos desde 2
+  }
+  return(result)
+}
+```
+
+## Método 2
+### Función supercamper2
+Devuelve la secuencia de palabras más larga a partir de la primera. El método a seguir es el siguiente: calculamos el camper de la palabra inicial y vemos todas las que nos devuelve. Después, calculamos el camper de todas las posibles soluciones y escogemos la que sea más larga, es decir, la que vaya a tener más posibilidades en el siguiente paso. 
+Esta función hace lo mismo que la función sec de antes, solo que calcula la secuencia máxima directamente, es decir, sin restringir la secuencia a las 1000 palabras.
+Hay otra diferencia con respecto a la función sec y, es que vamos a usar otra función camper:
+Lo que cambia en esta función con respecto del camper que definimos al principio es que en esta no aplicamos unique() al resultado final.
+
+(Creamos este otro supercamper2 porque cambiando el camper que teníamos al principio, nos daba una secuencia más larga. Sin embargo no sabíamos muy bien por qué, ya que lo único que cambiaba era el unique(). Pero al cargar el diccionario original ya le aplicamos unique(), por lo que pensamos que el unique() que teníamos al final de la función camper original no afectaría)
+```{r, results='hide'}
+camper2 <- function(word, v_dic){
+  cambiar_letra <- change_letter(word, v_dic)
+  permutaciones <- permutations(word, v_dic)
+  result <- c(cambiar_letra, permutaciones)  # no aplicamos unique()
+  return(result)
+}
+```
+
+```{r}
+supercamper2 <- function(word,v_dic,secuencia){
+  v_dic = setdiff(v_dic,word)  # reducimos el diccionario quitando la palabra de entrada
+  res = camper2(word,v_dic)  # todas las palabras posibles haciendo cambio de letra o permutaciones
+  if (length(res)>0){
+    longitudes = c()  # guardamos el número de posibilidades de cada palabra de res
+    for (i in 1:length(res)){
+      longitudes = append(longitudes,length(camper2(res[i],v_dic)))
+    }
+    # de todas las palabras de res, cogemos la que tiene mayor longitud de posibilidades
+    new_word = res[(which(longitudes==max(longitudes))[1])]  
+    secuencia = append(secuencia,new_word)
+    supercamper2(new_word,v_dic,secuencia)
+  }
+  else{
+    return(secuencia)
+  }
+}
+```
+
+## Anillo
+Para el anillo hemos usado la función supercamper que teníamos definida (método 1)
+```{r}
+anillo_aux<-function(secuencia,word,v_dic){
+  i=length(secuencia)  #empezamos desde el final para encontrar el anillo más largo
+  while (i<=length(secuencia)){
+    #si desde esa palabra podemos llegar a la palabra inicial, ya tenemos el anillo
+    if (word%in%camper(secuencia[i],v_dic)){   
+      return(i)
+    }
+    else{i=i-1}
+  }
+}
+anillo<-function(word,v_dic){
+  lines<-dicRed(v_dic,word)
+  sec=supercamper(word,lines)
+  sol=anillo_aux(sec,word,lines)
+  anillo_largo=append(sec[1:sol],word)
+  cat('El anillo más largo de esta palabra es de',sol,'palabras\n')
+  return(anillo_largo)
+}
+```
+
+## Pruebas
+Para las pruebas, hemos elegido la palabra 'casa'.
+
+### Palabra
+```{r}
+palabra <- 'casa'
+linesDicRed <- dicRed(linesDic, palabra)  # reducimos el diccionario
+```
+
+### 3.a. Elegir palabras al azar del diccionario y calcule la longitud de la secuencia más larga. Utilizamos el método 1
+```{r}
+ejer3<-supercamper(palabra,linesDicRed)
+length(ejer3)
+```
+
+### 3.b. Elegir palabras al azar del diccionario y calcule la longitud de la secuencia más larga. Utilizamos el método 2
+```{r}
+ejer3b<-supercamper2(palabra,linesDicRed, c(palabra))
+length(ejer3b)
+```
+
+### 4. ¿Podrías encontrar anillos (secuencia que te lleva a la palabra inicial)? ¿Cuál sería el anillo más grande?
+```{r}
+linesDicRed <- dicRed(linesDic, 'tu')
+anillo_tu<-anillo('tu',linesDicRed)
+anillo_tu
+```

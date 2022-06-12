@@ -1,0 +1,158 @@
+---
+title: "CAMPER"
+subtitle: 'Grupo 4'
+author: 
+  - Ignacio García Luengo
+  - David Lázaro Martín
+  - Pablo Martín Escobar
+  - Xiya Sun 
+  - Yimin Zhou
+date: "09/01/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+## LECTURA DE DICCIONARIO
+Leemos el diccionario del archivo "dic_es.txt"
+```{r}
+con <- file(description = '../datos/dic_es.txt',
+            open = 'rt',
+            blocking = TRUE,
+            encoding = 'UTF-8')
+linesDic <- readLines(con)
+close(con)
+linesDic <- unique(linesDic)  # por si hay palabras repetidas en el diccionario
+```
+
+
+## FUNCIÓN DE REDUCIR LAS LÍNEAS DEL DICCIONARIO
+Esta función recibe como parámetros el vector de las líneas del diccionario y una palabra. Y devuelve un diccionario reducido (las palabras que tengan el mismo número de caracteres que la palabra dada).
+Utilizamos esta función para que cuando apliquemos la función camper sobre un ejemplo, el procedimiento vaya más rápido.
+```{r}
+dicRed <- function(v_dic, word){
+  param <- nchar(word)  # número de caracteres de la palabra
+  linesRed <- subset(v_dic, nchar(v_dic) == param)
+  return(linesRed)
+}
+```
+
+
+## FUNCIÓN DE CAMBIAR UNA LETRA DE UNA PALABRA
+La función recibe como parámetros de entrada una palabra y un vector (diccionario). 
+Y nos devuelve un vector con todas las palabras del diccionario de la misma longitud que se consigue cambiando una letra a la palabra inicial.
+```{r results='hide'}
+change_letter <- function(word, v_dic){
+  library(stringdist)
+  # diccionario reducido (palabras de la misma longitud que word)
+  dic_filtrado <- dicRed(v_dic, word)  
+  
+  # palabras del diccionario que tienen distancia 1 con la palabra dada.
+  # estas palabras tienen distancia 1 por sustitución (porque el diccionario está reducido).
+  result <- subset(dic_filtrado, 
+                       stringdist(dic_filtrado, word, method = 'lv') == 1)  
+  return(result)
+}
+```
+
+Prueba de la función change_letter
+```{r}
+cambiarLetra <- change_letter('trapo', linesDic)
+cambiarLetra
+```
+
+# FUNCIÓN DE HACER PERMUTACIONES
+La función recibe como parámetros de entrada una palabra y un vector (nuestro caso, un diccionario).
+Nos devuelve un vector con todas las palabras del diccionario con las letras permutadas de la palabra original.
+```{r results='hide'}
+permutations <- function(word, v_dic){
+  cadena_word <- unlist(strsplit(word, split = ''))  # separamos las letras de la palabra
+  
+  if (!require(combinat)) install.packages("combinat")
+  library(combinat) # Usamos la librería "combinat" que contiene una función de hacer permutaciones.
+  # nos devuelve una lista de las permutaciones, 
+  # donde cada elemento de la lista es un vector de las letras permutadas.
+  lista_perm <- permn(cadena_word) 
+  
+  # lista de permutaciones con las letras unidas
+  lista_perm_paste <- lapply(lista_perm, paste, collapse = '')  
+  vector_perm <- unlist(lista_perm_paste)
+  
+  # de todas las permutaciones, nos quedamos con las que están en el diccionario.
+  result <- subset(vector_perm, vector_perm%in%v_dic&vector_perm!=word)  
+  return(result)
+}
+```
+
+Prueba de la función permutations
+```{r}
+permutaciones <- permutations('trapo', linesDic)
+permutaciones
+```
+
+## FUNCIÓN: CAMBIO DE LETRA + PERMUTACIONES
+La función recibe como parámetros de entrada una palabra y un vector (nuestro caso, un diccionario).
+Devuelve un vector con las palabras del diccionario conseguidas siguiendo el procedimiento de cambiar una letra y permutar.
+```{r, results='hide'}
+camper <- function(word, v_dic){
+  cambiar_letra <- change_letter(word, v_dic)
+  permutaciones <- permutations(word, v_dic)
+  result <- unique(c(cambiar_letra, permutaciones))  # puede haber palabras repetidas
+  return(result)
+}
+```
+
+Prueba de la función camper:
+```{r}
+todas_posibilidades <- camper(word = 'trapo', v_dic = linesDic)
+todas_posibilidades
+```
+
+## FUNCIÓN: SECUENCIA DE PALABRAS
+La función recibe como parámetros de entrada una palabra, el diccionario y el nº máximo de palabra de la secuencia (sin contar la palabra inicial). Y nos devuelve la secuencia de palabras.
+```{r}
+camper_sec <- function(word, v_dic, nmax){
+  serie <- c(word)  # añadimos la palabra inicial a la serie.
+  vacio <- FALSE  # para que cuando encuentre palabra ganadora, nos salgamos del bucle
+  i = 1
+
+  while (i<=nmax & vacio == FALSE){
+    # todas las palabras conseguidas haciendo cambio de letra o permutaciones.
+    todas_posibilidades <- camper(word, v_dic)  
+    # todas las palabras que no estén ya en la serie
+    todas_posibilidades_noSerie <- setdiff(todas_posibilidades, serie)  
+    
+    # si hay palabras en el vector todas_posibilidades_noSerie, 
+    # escogemos una de ellas y la añadimos a la serie.
+    if (length(todas_posibilidades_noSerie)!=0){
+      pos <- sample(1:length(todas_posibilidades_noSerie), 1)  # número aleatorio
+      word <- todas_posibilidades_noSerie[pos] # elegimos palabra aleatoria
+      serie <- c(serie, word)  # añadimos la palabra elegida a la serie.
+    }
+    # si no quedan palabras en el vector todas_posibilidades_noSerie, nos salimos del bucle
+    else {
+      vacio <- TRUE
+    }
+    i = i + 1
+  }
+  return(serie)
+}
+```
+
+
+## EJEMPLO 
+Dada una palabra, hacer una secuencia de palabras siguiendo el procedimiento descrito.
+Para las pruebas, escogeremos la palabra 'magia'.
+```{r}
+palabra <- 'magia'
+
+# Vamos a reducir el diccionario a las palabras que tengan el mismo número de 
+# caracteres que la palabra 'magia' para que sea más rápido.
+linesDicRed <- dicRed(linesDic, palabra)
+```
+
+```{r}
+# secuencia
+secuencia <- camper_sec(palabra, linesDicRed, 10)
+secuencia
+```
+
